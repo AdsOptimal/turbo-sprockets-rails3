@@ -54,16 +54,27 @@ module Sprockets
             end
             # Set modification and access times
             File.utime(File.atime(abs_digest_path), mtime, abs_logical_path)
-
+            
+            abs_logical_path_gzip = add_gzip_extension(abs_logical_path)
+            abs_digest_path_gzip = add_gzip_extension(abs_digest_path)
+            
             # Also write gzipped asset
-            File.open("#{abs_logical_path}.gz", 'wb') do |f|
+            File.open(abs_logical_path_gzip, 'wb') do |f|
+              gz = Zlib::GzipWriter.new(f, Zlib::BEST_COMPRESSION)
+              gz.mtime = mtime.to_i
+              gz.write asset_body
+              gz.close
+            end
+            
+            # Also write gzipped asset
+            File.open(abs_digest_path_gzip, 'wb') do |f|
               gz = Zlib::GzipWriter.new(f, Zlib::BEST_COMPRESSION)
               gz.mtime = mtime.to_i
               gz.write asset_body
               gz.close
             end
 
-            env.logger.debug "Stripped digests, copied to #{logical_path}, and created gzipped asset"
+            env.logger.debug "Stripped digests, copied to #{abs_logical_path_gzip}, and created gzipped asset #{abs_digest_path_gzip}"
 
           else
             # Otherwise, treat file as binary and copy it.
@@ -72,23 +83,25 @@ module Sprockets
               FileUtils.cp_r abs_digest_path, abs_logical_path, :remove_destination => true
               env.logger.debug "Copied binary asset to #{logical_path}"
 
+              abs_logical_path_gzip = add_gzip_extension(abs_logical_path)
+              abs_digest_path_gzip = add_gzip_extension(abs_digest_path)
+
               # Copy gzipped asset if exists
-              if File.exist? "#{abs_digest_path}.gz"
-                FileUtils.cp_r "#{abs_digest_path}.gz", "#{abs_logical_path}.gz", :remove_destination => true
-                env.logger.debug "Copied gzipped asset to #{logical_path}.gz"
+              if File.exist? abs_digest_path_gzip
+                FileUtils.cp_r abs_digest_path_gzip, abs_logical_path_gzip, :remove_destination => true
+                env.logger.debug "Copied gzipped asset to #{abs_logical_path_gzip}"
               end
             end
           end
         end
       end
 
-
       elapsed_time = ((Time.now.to_f - start_time) * 1000).to_i
       env.logger.debug "Generated non-digest assets in #{elapsed_time}ms"
     end
 
     private
-
+    
     def compile_path?(logical_path)
       paths.each do |path|
         case path

@@ -1,6 +1,17 @@
 require "fileutils"
 require 'shellwords'
 
+def add_gzip_extension(path)
+  return nil if path.nil?
+  if (path.match(/\.(js|css)$/))
+    prefix, extension = path.match(/^(.*)\.(js|css)$/).captures
+    prefix.sub!(/\/index(-[0-9a-f]{32})?$/, "")
+    return "#{prefix}.gz.#{extension}"
+  else
+    return "#{path}.gz"
+  end
+end
+
 # Clear all assets tasks from sprockets railtie,
 # but preserve any extra actions added via 'enhance'
 task_enhancements = {}
@@ -40,7 +51,8 @@ namespace :assets do
   # including gzipped assets and manifests
   def known_assets
     assets = Rails.application.config.assets.digests.to_a.flatten.map do |asset|
-      [asset, "#{asset}.gz"]
+      asset_gzip = add_gzip_extension(asset)
+      [asset, asset_gzip]
     end.flatten
     assets + %w(manifest.yml sources_manifest.yml)
   end
